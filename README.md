@@ -1,40 +1,84 @@
-# ✨ WonderSnap
+``` # ✨ WonderSnap
 
-Snap a photo or ask a question and get a playable physics or engineering simulation, generated live by Gemini.
+**Point your camera at anything (a bicycle, a kettle, a Wi-Fi router) and get a mini science game that shows how it works.**
 
-## Setup (about 5 minutes)
+WonderSnap sends your photo (or a typed question) to an AI model. The AI works out what the object is and which science explains it, then writes a small interactive web page made just for you. The page has:
 
-```bash
-cd wondersnap
-python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .streamlit/secrets.toml.example .streamlit/secrets.toml
-# paste your key from https://aistudio.google.com/apikey into secrets.toml
-streamlit run app.py
-```
+- 📝 a two-sentence explanation
+- 🎞 an animated diagram
+- 🎚 2–3 sliders or buttons that change the animation live (for example temperature, speed, or number of gear teeth)
+- 🧠 a short quiz to check what you learned
 
-**Model:** the default is `gemini-3.5-flash`. Google retires models often, so check which Flash models AI Studio currently lists, then change the name in the sidebar or set `GEMINI_MODEL=...` before running.
+You choose how deep the explanation goes: **7-Year-Old**, **High Schooler**, or **Engineer**.
 
-## Files
+---
 
-| File | What it does |
+## 📋 Contents
+
+1. [What you need](#-what-you-need)
+2. [Get an AI key (pick one)](#-step-1--get-an-ai-key-pick-one)
+3. [Install and run](#-step-2--install-and-run)
+4. [Using the app](#-step-3--using-the-app)
+5. [Tips for a live demo](#-tips-for-a-live-demo)
+6. [How it works](#-how-it-works-in-plain-language)
+7. [What's in the folder](#-whats-in-the-folder)
+8. [Changing things](#-changing-things)
+9. [Troubleshooting](#-troubleshooting)
+
+---
+
+## 🧰 What you need
+
+| You need | Why | How to check |
+|---|---|---|
+| A laptop (Windows, Mac or Linux) | To run the app | — |
+| **Python 3.9 or newer** | The app is written in Python | Run python --version (on Mac/Linux, maybe python3 --version). Don't have it? Download it from [python.org](https://www.python.org/downloads/). On Windows, tick **"Add Python to PATH"** during install. |
+| An internet connection | The AI runs online | — |
+| **One** AI key: Google *or* OpenRouter | Lets the app talk to the AI | See Step 1 |
+| A webcam (optional) | To snap photos | You can also upload a photo or just type a question |
+
+No database or server setup, and you don't write any web code.
+
+---
+
+## 🔑 Step 1 — Get an AI key (pick one)
+
+An "API key" is a password that lets the app use an AI service. **You only need one of these two.**
+
+### Option A: Google AI Studio (Gemini)
+1. Go to **https://aistudio.google.com/apikey** and sign in with a Google account.
+2. Click **Create API key** and copy it.
+3. Google AI Studio usually has a free tier, which is fine for a hackathon. Check the current limits on the page.
+
+### Option B: OpenRouter
+[OpenRouter](https://openrouter.ai) gives one key for models from many companies (Google, Anthropic, OpenAI, and others).
+1. Go to **https://openrouter.ai/keys**, sign in, and click **Create key**. Copy it; it starts with sk-or-.
+2. Add a few dollars of credit on OpenRouter, since most models are pay-per-use. Each simulation costs a fraction of a cent to a few cents, depending on the model.
+
+> 🔒 **Keep your key secret.** Don't paste it in chat groups, slides, or GitHub. Anyone with it can spend your quota.
+
+---
+
+## 🚀 Step 2 — Install and run
+
+Open a terminal (Mac: **Terminal**; Windows: **Command Prompt** or **PowerShell**) and run these commands one by one.
+
+**1. Go into the project folder** (wherever you unzipped it):
+cd path/to/wondersnap
+
+**2. Create a private Python environment** (keeps this project's packages separate from the rest of your computer):
+
+| Windows | Mac / Linux |
 |---|---|
-| `app.py` | Streamlit UI: camera / upload / question input, level picker, streaming generation, retry, sandboxed rendering, backup demos |
-| `prompts.py` | The system prompt (output contract, layout, quiz rules) and the per-level instructions. **Tune this file the most.** |
-| `demos/` | Saved simulations for offline demo mode. Ships with `bicycle-gears.html`. |
+| python -m venv .venv | python3 -m venv .venv |
+| .venv\Scripts\activate | source .venv/bin/activate |
 
-## How it works
+Once it's active you'll see (.venv) at the start of the terminal line. Run the *activate* command again each time you open a new terminal.
 
-1. The image is shrunk to 1024 px (faster upload) and sent to Gemini with the system prompt and level.
-2. Gemini streams back HTML between `<<<HTML>>>` / `<<<END>>>` markers. A live character counter shows progress.
-3. `extract_html()` strips markers and stray markdown fences. If the page has no `<script>` plus `<canvas>`/`<svg>`, the app retries once.
-4. The page is shown in an iframe loaded from a `data:` URL, so the generated JavaScript runs on an isolated origin and can't touch the app.
-5. Results are cached per photo + question + level, so re-clicking during the demo is instant.
+**3. Install the packages:**
+pip install -r requirements.txt
 
-## Demo-day checklist
-
-- [ ] **Pre-bake 3 backups.** Generate a French press, a bicycle and a Wi-Fi router, then use **Save as backup demo** under each result. If the Wi-Fi or API fails, turn on **Offline demo mode** in the sidebar. (Backups don't need the API, but their styling still loads from the Tailwind CDN. Without internet they work but look plain.)
-- [ ] **Show the "wow" comparison:** turn on *Compare two levels side by side* and show the 7-Year-Old vs Engineer versions of one object.
-- [ ] **Phone demo:** phones need HTTPS for the camera, so deploy free on [Streamlit Community Cloud](https://share.streamlit.io) and add `GEMINI_API_KEY` under the app's *Secrets*. On a phone, use **Upload / phone camera**: it opens the rear camera, whereas the webcam widget often opens the selfie camera.
-- [ ] Narrate the wait: "it's writing a brand-new app for you right now."
-- [ ] Never commit `.streamlit/secrets.toml` (already in `.gitignore`).
+**4. Save your key.** In the .streamlit folder, make a copy of secrets.toml.example and name the copy **`secrets.toml`**. Open it in any text editor and paste your key between the quotes on the matching line:
+GEMINI_API_KEY = "paste-your-google-key-here"      # if you chose Option A
+OPENROUTER_API_KEY = "sk-or-paste-your-key-here"   # if you chose Option B
+Fill in one or both, then save the file.
