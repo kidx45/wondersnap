@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bicycle Gears</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  input[type=range]{accent-color:#059669}
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<div class="max-w-2xl mx-auto p-4 space-y-4">
+  <div class="bg-white rounded-2xl shadow-sm p-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h1 class="text-2xl font-bold">🚲 Bicycle Gears</h1>
+      <span class="text-xs font-semibold bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">Gear ratio &amp; torque</span>
+    </div>
+    <p class="mt-3 text-slate-600 leading-relaxed">Your pedals turn a big front gear that pulls a chain around a smaller back gear, so one push of the pedals can spin the wheel several times. The ratio of teeth decides the trade-off: more wheel speed means each push has to be harder.</p>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-sm p-3">
+    <canvas id="c" class="w-full rounded-xl bg-sky-50" style="height:260px"></canvas>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
+    <div>
+      <label for="front" class="flex justify-between text-sm font-medium"><span>Front gear (chainring)</span><span id="frontV" class="text-emerald-700"></span></label>
+      <input id="front" type="range" min="22" max="52" value="44" class="w-full">
+    </div>
+    <div>
+      <label for="rear" class="flex justify-between text-sm font-medium"><span>Rear gear (cog)</span><span id="rearV" class="text-emerald-700"></span></label>
+      <input id="rear" type="range" min="11" max="34" value="16" class="w-full">
+    </div>
+    <div>
+      <label for="cad" class="flex justify-between text-sm font-medium"><span>Pedalling speed</span><span id="cadV" class="text-emerald-700"></span></label>
+      <input id="cad" type="range" min="20" max="120" value="70" class="w-full">
+    </div>
+    <div class="grid grid-cols-3 gap-2 text-center">
+      <div class="bg-emerald-50 rounded-xl p-2"><div class="text-xs text-slate-500">Gear ratio</div><div id="ratio" class="text-lg font-bold"></div></div>
+      <div class="bg-emerald-50 rounded-xl p-2"><div class="text-xs text-slate-500">Wheel speed</div><div id="wrpm" class="text-lg font-bold"></div></div>
+      <div class="bg-emerald-50 rounded-xl p-2"><div class="text-xs text-slate-500">Bike speed</div><div id="kmh" class="text-lg font-bold"></div></div>
+    </div>
+    <p id="readout" class="text-sm text-slate-600"></p>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-sm p-5">
+    <button id="quizBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl">🧠 Test yourself</button>
+    <div id="quiz" class="hidden mt-4"></div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const $ = id => document.getElementById(id);
+  const canvas = $('c'), ctx = canvas.getContext('2d');
+  const WHEEL_CIRC = 2.1; // metres, typical 700c road wheel
+  let front = 44, rear = 16, cad = 70, aF = 0, aR = 0, last = performance.now();
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+
+  function gear(x, y, teeth, angle, color) {
+    const r = teeth * 1.9, tooth = 6;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+    ctx.beginPath();
+    for (let i = 0; i < teeth * 2; i++) {
+      const a = i / (teeth * 2) * Math.PI * 2, rr = i % 2 ? r : r + tooth;
+      ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.35, 0, 7); ctx.fillStyle = '#f0f9ff'; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r * 0.8, 0); ctx.strokeStyle = '#f0f9ff'; ctx.lineWidth = 4; ctx.stroke();
+    ctx.restore();
+    return r;
+  }
+
+  function update() {
+    front = +$('front').value; rear = +$('rear').value; cad = +$('cad').value;
+    const ratio = front / rear, wheel = cad * ratio, kmh = wheel * WHEEL_CIRC * 60 / 1000;
+    $('frontV').textContent = front + ' teeth';
+    $('rearV').textContent = rear + ' teeth';
+    $('cadV').textContent = cad + ' rpm';
+    $('ratio').textContent = ratio.toFixed(2) + ' : 1';
+    $('wrpm').textContent = Math.round(wheel) + ' rpm';
+    $('kmh').textContent = kmh.toFixed(1) + ' km/h';
+    $('readout').textContent = ratio >= 1
+      ? `One pedal turn spins the wheel ${ratio.toFixed(2)}× — faster, but each push needs ${ratio.toFixed(2)}× more force on the pedals.`
+      : `One pedal turn spins the wheel only ${ratio.toFixed(2)}× — slow, but great for climbing hills.`;
+  }
+  ['front', 'rear', 'cad'].forEach(id => $(id).addEventListener('input', update));
+  update();
+
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05); last = now;
+    const w = canvas.getBoundingClientRect().width, h = canvas.getBoundingClientRect().height;
+    aF += cad / 60 * Math.PI * 2 * dt;
+    aR += cad / 60 * (front / rear) * Math.PI * 2 * dt;
+    ctx.clearRect(0, 0, w, h);
+    const fx = w * 0.68, rx = w * 0.27, cy = h * 0.5;
+    const rF = front * 1.9, rR = rear * 1.9;
+    // chain
+    ctx.strokeStyle = '#334155'; ctx.lineWidth = 3; ctx.setLineDash([6, 4]);
+    ctx.lineDashOffset = -aF * rF;
+    ctx.beginPath(); ctx.moveTo(rx, cy - rR - 3); ctx.lineTo(fx, cy - rF - 3);
+    ctx.moveTo(rx, cy + rR + 3); ctx.lineTo(fx, cy + rF + 3); ctx.stroke(); ctx.setLineDash([]);
+    gear(rx, cy, rear, aR, '#0ea5e9');
+    gear(fx, cy, front, aF, '#059669');
+    // pedal crank
+    ctx.save(); ctx.translate(fx, cy); ctx.rotate(aF);
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, rF + 22); ctx.stroke();
+    ctx.fillStyle = '#1e293b'; ctx.fillRect(-12, rF + 18, 24, 8); ctx.restore();
+    ctx.fillStyle = '#475569'; ctx.font = '13px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('Rear cog → wheel', rx, h - 10); ctx.fillText('Chainring ← pedals', fx, h - 10);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // quiz
+  const Q = [
+    { q: 'Set the front gear to 44 and the rear to 11. How many times does the wheel turn per pedal turn?', o: ['0.25', '4', '11', '44'], a: 1, e: '44 ÷ 11 = 4, so the wheel spins 4 times for each pedal turn.' },
+    { q: 'You are riding up a steep hill. Which rear gear makes pedalling easiest?', o: ['The smallest cog', 'The biggest cog', 'It makes no difference'], a: 1, e: 'A big rear cog lowers the ratio: the wheel turns less per pedal stroke, so each push needs less force.' },
+    { q: 'If you double your pedalling speed in the same gear, your bike speed…', o: ['Stays the same', 'Doubles', 'Halves'], a: 1, e: 'Wheel speed = pedal speed × ratio, so doubling the pedal speed doubles the wheel speed.' }
+  ];
+  let i = 0, score = 0;
+  const box = $('quiz');
+  function render() {
+    if (i >= Q.length) {
+      box.innerHTML = `<div class="text-center space-y-3"><div class="text-xl font-bold">You scored ${score} / ${Q.length} ${score === Q.length ? '🎉' : '💪'}</div><button id="again" class="bg-slate-800 text-white px-4 py-2 rounded-xl">Try again</button></div>`;
+      $('again').onclick = () => { i = 0; score = 0; render(); };
+      return;
+    }
+    const it = Q[i];
+    box.innerHTML = `<div class="text-xs text-slate-500 mb-1">Question ${i + 1} of ${Q.length}</div><div class="font-semibold mb-3">${it.q}</div>` +
+      it.o.map((o, k) => `<button data-k="${k}" class="opt block w-full text-left border border-slate-200 hover:border-emerald-400 rounded-xl px-4 py-2 mb-2">${o}</button>`).join('') +
+      `<div id="fb" class="text-sm mt-2"></div>`;
+    box.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+      const k = +b.dataset.k, ok = k === it.a;
+      if (ok) score++;
+      box.querySelectorAll('.opt').forEach(x => { x.disabled = true; if (+x.dataset.k === it.a) x.classList.add('bg-emerald-100', 'border-emerald-500'); });
+      if (!ok) b.classList.add('bg-rose-100', 'border-rose-400');
+      $('fb').innerHTML = `<span class="font-semibold">${ok ? '✅ Correct!' : '❌ Not quite.'}</span> ${it.e} <button id="next" class="ml-2 underline text-emerald-700">Next →</button>`;
+      $('next').onclick = () => { i++; render(); };
+    });
+  }
+  $('quizBtn').onclick = () => { box.classList.remove('hidden'); render(); };
+});
+</script>
+</body>
+</html>
